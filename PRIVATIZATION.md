@@ -19,3 +19,15 @@ RESOURCES FOR PRIVATIZATION
 9. **Web App**: A web app is created within the App Service Plan. It includes app settings for various configurations, including integration with your bot service, Azure Search, and Azure OpenAI.
 
 Azuredeploy.bicep in the root directory of this repository contains the code for the deployment of the above resources except for the Web App. The Web App is deployed using the bicep files in app/backend directory and app/frontend directory.
+
+| Resource                | Privatized (Yes/No) |
+|-------------------------|---------------------|
+| Azure Search Service    | Yes                 |
+| Cognitive Service       | Yes                 |
+| SQL Server and Database | Yes                 |
+| Cosmos DB               | Yes                 |
+| Bing Search API         | No                  |
+| Form Recognizer         | (Check Azure Docs)  |
+| Blob Storage Account    | Yes                 |
+| App Service Plan        | Yes                 |
+| Web App                 | Yes                 |
