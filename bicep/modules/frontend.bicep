@@ -1,15 +1,16 @@
 @description('Optional. Web app name must be between 2 and 60 characters.')
 @minLength(2)
 @maxLength(60)
-param webAppName string = 'webApp-Frontend-${uniqueString(resourceGroup().id)}'
+param webAppName string = 'webApp-gpt-Frontend'
 
 @description('Optional, defaults to S3. The SKU of App Service Plan. The allowed values are B3, S3 and P2v3.')
 @allowed([
+  'B1'
   'B3'
   'S3'
   'P2v3'
 ])
-param appServicePlanSKU string = 'S3'
+param appServicePlanSKU string = 'B1'
 
 @description('Optional. The name of the App Service Plan.')
 param appServicePlanName string = 'AppServicePlan-Frontend-${uniqueString(resourceGroup().id)}'
@@ -17,8 +18,15 @@ param appServicePlanName string = 'AppServicePlan-Frontend-${uniqueString(resour
 @description('Optional, defaults to resource group location. The location of the resources.')
 param location string = resourceGroup().location
 
-@description('Subnet of the WebApp for vnet integration')
+@description('Vnet id.')
+param vnet_id string
+
+@description('Subnet of the WebApp private endpoint.')
 param subnet_id string
+
+param privateEndpointName string = 'pe-${webAppName}'
+
+param private_dns_zone_name string = 'privatelink.azurewebsites.net'
 
 // @description('Required. The name of your Bot Service.')
 // param botServiceName string
@@ -76,10 +84,10 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
 resource webApp 'Microsoft.Web/sites@2022-09-01' = {
   name: webAppName
   location: location
-
   properties: {
     virtualNetworkSubnetId: subnet_id
     serverFarmId: appServicePlan.id
+    publicNetworkAccess: 'Disabled'
     siteConfig: {
       appSettings: [
         // {
@@ -122,21 +130,76 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
         //   name: 'AZURE_OPENAI_API_VERSION'
         //   value: azureOpenAIAPIVersion
         //}
-        {
-          name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
-          value: 'true'
-        }
+        // {
+        //   name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
+        //   value: 'true'
+        // }
       ]
     }
   }
 }
 
-resource webAppConfig 'Microsoft.Web/sites/config@2022-09-01' = {
-  parent: webApp
-  name: 'web'
+
+// resource webAppConfig 'Microsoft.Web/sites/config@2022-09-01' = {
+//   parent: webApp
+//   name: 'web'
+//   properties: {
+//     linuxFxVersion: 'PYTHON|3.10'
+//     alwaysOn: true
+//     appCommandLine: 'python -m streamlit run Home.py --server.port 8000 --server.address 0.0.0.0'
+//   }
+// }
+
+
+resource BackendPrivateEndpoint 'Microsoft.Network/privateEndpoints@2021-05-01' = {
+  name: privateEndpointName
+  location: location
   properties: {
-    linuxFxVersion: 'PYTHON|3.10'
-    alwaysOn: true
-    appCommandLine: 'python -m streamlit run Home.py --server.port 8000 --server.address 0.0.0.0'
+    subnet: {
+      id: subnet_id
+    }
+    privateLinkServiceConnections: [
+      {
+        name: '${privateEndpointName}-privateLinkServiceConnection'
+        properties: {
+          privateLinkServiceId: webApp.id
+          groupIds: [
+            'sites'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+resource privateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: private_dns_zone_name
+  location: 'global'
+}
+
+resource privateDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: privateDnsZone
+  name: '${private_dns_zone_name}-link'
+  location: 'global'
+  properties: {
+    registrationEnabled: false
+    virtualNetwork: {
+      id: vnet_id
+    }
+  }
+}
+
+resource pvtEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2021-05-01' = {
+  name: '${privateEndpointName}-privateDnsZoneGroup'
+  parent: BackendPrivateEndpoint
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: '${privateEndpointName}-privateDnsZoneConfig'
+        properties: {
+          privateDnsZoneId: privateDnsZone.id
+        }
+      }
+    ]
   }
 }

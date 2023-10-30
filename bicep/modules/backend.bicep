@@ -58,7 +58,14 @@ param SQLServerPassword string
 // @description('Required. The name of the Azure CosmosDB container.')
 // param cosmosDBContainerName string
 
+param webAppName string = 'webApp-gpt-Backend'
+param privateEndpointName string = 'pe-${webAppName}}'
+
+@description('Vnet & Subnet id for private endpoints.')
+param vnet_id string
 param subnet_id string
+
+param private_dns_zone_name string = 'privatelink.azurewebsites.net'
 
 @description('Optional. The globally unique and immutable bot ID. Also used to configure the displayName of the bot, which is mutable.')
 param botId string = 'BotId-${uniqueString(resourceGroup().id)}'
@@ -75,11 +82,12 @@ param appServicePlanName string = 'AppServicePlan-Backend-${uniqueString(resourc
 
 @description('Optional, defaults to S3. The SKU of the App Service Plan. Acceptable values are B3, S3 and P2v3.')
 @allowed([
+  'B1'
   'B3'
   'S3'
   'P2v3'
 ])
-param appServicePlanSKU string = 'S3'
+param appServicePlanSKU string = 'B1'
 
 @description('Optional, defaults to resource group location. The location of the resources.')
 param location string = resourceGroup().location
@@ -87,7 +95,8 @@ param location string = resourceGroup().location
 // Variables.
 
 var publishingUsername = '$${botId}'
-var webAppName = 'webApp-Backend-${botId}'
+
+
 // var siteHost = '${webAppName}.azurewebsites.net'
 // var botEndpoint = 'https://${siteHost}/api/messages'
 
@@ -133,6 +142,7 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
   properties: {
     virtualNetworkSubnetId: subnet_id
     enabled: true
+    publicNetworkAccess: 'Disabled'
     hostNameSslStates: [
       {
         name: '${webAppName}.azurewebsites.net'
@@ -236,73 +246,73 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
         //   name: 'AZURE_COMOSDB_CONNECTION_STRING'
         //   value: cosmosDB.listConnectionStrings().connectionStrings[0].connectionString
         // }
-        {
-          name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
-          value: 'true'
-        }
-      ]
-      cors: {
-        allowedOrigins: [
-          'https://botservice.hosting.portal.azure.net'
-          'https://hosting.onecloud.azure-test.net/'
+      //   {
+      //     name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
+      //     value: 'true'
+      //   }
+      // ]
+      // cors: {
+      //   allowedOrigins: [
+      //     'https://botservice.hosting.portal.azure.net'
+      //     'https://hosting.onecloud.azure-test.net/'
         ]
-      }
+      // }
     }
   }
 }
 
-resource webAppConfig 'Microsoft.Web/sites/config@2022-09-01' = {
-  parent: webApp
-  name: 'web'
-  properties: {
-    numberOfWorkers: 1
-    defaultDocuments: [
-      'Default.htm'
-      'Default.html'
-      'Default.asp'
-      'index.htm'
-      'index.html'
-      'iisstart.htm'
-      'default.aspx'
-      'index.php'
-      'hostingstart.html'
-    ]
-    netFrameworkVersion: 'v4.0'
-    phpVersion: ''
-    pythonVersion: ''
-    nodeVersion: ''
-    linuxFxVersion: 'PYTHON|3.10'
-    requestTracingEnabled: false
-    remoteDebuggingEnabled: false
-    remoteDebuggingVersion: 'VS2017'
-    httpLoggingEnabled: true
-    logsDirectorySizeLimit: 35
-    detailedErrorLoggingEnabled: false
-    publishingUsername: publishingUsername
-    scmType: 'None'
-    use32BitWorkerProcess: true
-    webSocketsEnabled: false
-    alwaysOn: true
-    appCommandLine: 'gunicorn --bind 0.0.0.0 --worker-class aiohttp.worker.GunicornWebWorker --timeout 600 app:APP'
-    managedPipelineMode: 'Integrated'
-    virtualApplications: [
-      {
-        virtualPath: '/'
-        physicalPath: 'site\\wwwroot'
-        preloadEnabled: false
-        virtualDirectories: null
-      }
-    ]
-    loadBalancing: 'LeastRequests'
-    experiments: {
-      rampUpRules: []
-    }
-    autoHealEnabled: false
-    vnetName: ''
-    minTlsVersion: '1.2'
-    ftpsState: 'AllAllowed'
-  }
-}
+// resource webAppConfig 'Microsoft.Web/sites/config@2022-09-01' = {
+//   parent: webApp
+//   name: 'web'
+//   properties: {
+//     numberOfWorkers: 1
+//     defaultDocuments: [
+//       'Default.htm'
+//       'Default.html'
+//       'Default.asp'
+//       'index.htm'
+//       'index.html'
+//       'iisstart.htm'
+//       'default.aspx'
+//       'index.php'
+//       'hostingstart.html'
+//     ]
+//     netFrameworkVersion: 'v4.0'
+//     phpVersion: ''
+//     pythonVersion: ''
+//     nodeVersion: ''
+//     linuxFxVersion: 'PYTHON|3.10'
+//     requestTracingEnabled: false
+//     remoteDebuggingEnabled: false
+//     remoteDebuggingVersion: 'VS2017'
+//     httpLoggingEnabled: true
+//     logsDirectorySizeLimit: 35
+//     detailedErrorLoggingEnabled: false
+//     publishingUsername: publishingUsername
+//     scmType: 'None'
+//     use32BitWorkerProcess: true
+//     webSocketsEnabled: false
+//     alwaysOn: true
+//     appCommandLine: 'gunicorn --bind 0.0.0.0 --worker-class aiohttp.worker.GunicornWebWorker --timeout 600 app:APP'
+//     managedPipelineMode: 'Integrated'
+//     virtualApplications: [
+//       {
+//         virtualPath: '/'
+//         physicalPath: 'site\\wwwroot'
+//         preloadEnabled: false
+//         virtualDirectories: null
+//       }
+//     ]
+//     loadBalancing: 'LeastRequests'
+//     experiments: {
+//       rampUpRules: []
+//     }
+//     autoHealEnabled: false
+//     vnetName: ''
+//     minTlsVersion: '1.2'
+//     ftpsState: 'AllAllowed'
+//   }
+// }
 
 // resource bot 'Microsoft.BotService/botServices@2022-09-15' = {
 //   name: botId
@@ -324,3 +334,57 @@ resource webAppConfig 'Microsoft.Web/sites/config@2022-09-01' = {
 //     webApp
 //   ]
 // }
+
+
+resource BackendPrivateEndpoint 'Microsoft.Network/privateEndpoints@2021-05-01' = {
+  name: privateEndpointName
+  location: location
+  properties: {
+    subnet: {
+      id: subnet_id
+    }
+    privateLinkServiceConnections: [
+      {
+        name: '${privateEndpointName}-privateLinkServiceConnection'
+        properties: {
+          privateLinkServiceId: webApp.id
+          groupIds: [
+            'sites'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+resource privateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: private_dns_zone_name
+  location: 'global'
+}
+
+resource privateDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: privateDnsZone
+  name: '${private_dns_zone_name}-link'
+  location: 'global'
+  properties: {
+    registrationEnabled: false
+    virtualNetwork: {
+      id: vnet_id
+    }
+  }
+}
+
+resource pvtEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2021-05-01' = {
+  name: '${privateEndpointName}-privateDnsZoneGroup'
+  parent: BackendPrivateEndpoint
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: '${privateEndpointName}-privateDnsZoneConfig'
+        properties: {
+          privateDnsZoneId: privateDnsZone.id
+        }
+      }
+    ]
+  }
+}

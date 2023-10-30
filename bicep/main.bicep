@@ -1,9 +1,6 @@
-targetScope = 'subscription'
+targetScope = 'resourceGroup'
 
 /// Parameters ///
-
-@description('ID of the subscription')
-param subscription_id string = '4b3e8c6e-448a-4a6c-9c1d-106719e46a65'
 
 @description('Azure region used for the deployment of all resources')
 param location string = 'westeurope'
@@ -12,26 +9,25 @@ param location string = 'westeurope'
 param location_abbreviation string = 'weu'
 
 @description('Name of the workload that will be deployed')
-param workload string = 'webapp'
+param workload string = 'azure-chatbot'
 
 param environment string = 'dev'
 
 @description('name of the resource group where the workload will be deployed')
 param rg_name string
 
-param rg_tags object = {}
-
 @description('SQL Server Name')
 param SQLServerName string = 'sql-${workload}-${environment}-${location_abbreviation}'
 
 @description('SQL Server Database Name')
-param SQLServerDatabase string = 'db-${workload}-${environment}-${location_abbreviation}'
+param SQLDBName string = 'db-${workload}-${environment}-${location_abbreviation}'
 
-@description('SQL Server Username')
-param SQLServerUsername string = 'sqladmin'
+@description('SQL administrator login')
+param SQLAdministratorLogin string
 
 @secure()
-param SQLServerPassword string = ''
+@description('SQL administrator login password')
+param SQLAdministratorLoginPassword string
 
 // @description('Azure OpenAI API Key')
 // param azureOpenAIAPIKey string = ''
@@ -53,63 +49,57 @@ param SQLServerPassword string = ''
 
 /// Variables ///
 
-var tags = union({
-    workload: workload
-    environment: environment
-  }, rg_tags)
-
-/// Resources ///
-
-// resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
-//   name: 'rg-${workload}-${environment}-${location_abbreviation}'
-//   location: location
-//   tags: tags
-// }
-
 /// Modules ///
 
 module network 'modules/vnet.bicep' = {
   scope: resourceGroup(rg_name)
   name: 'network-${workload}-deployment'
   params: {
-    vnetName: 'vnet-${workload}-${environment}-${location_abbreviation}'
     location: location
+    vnetName: 'vnet-${workload}-${environment}-${location_abbreviation}'
   }
 }
 
 module frontend 'modules/frontend.bicep' = {
-  scope: resourceGroup(rg.name)
+  scope: resourceGroup(rg_name)
   name: 'frontend-${workload}-deployment'
   params: {
+    location: location
     // azureOpenAIAPIKey: azureOpenAIAPIKey
     // azureOpenAIName: azureOpenAIName
     // azureSearchName: azureSearchName
     // blobSASToken: blobSASToken
     // botDirectLineChannelKey: botDirectLineChannelKey
     // botServiceName: botServiceName
-    subnet_id: network.outputs.frontendSubnetId
-    location: location
+    vnet_id: network.outputs.vnetId
+    subnet_id: network.outputs.privateSubnetId
   }
 }
 
 module backend 'modules/backend.bicep' = {
-  scope: resourceGroup(rg.name)
+  scope: resourceGroup(rg_name)
   name: 'backend-${workload}-deployment'
   params: {
-    SQLServerName: SQLServerName
-    SQLServerDatabase: SQLServerDatabase
-    SQLServerUsername: SQLServerUsername
-    SQLServerPassword: SQLServerPassword
     location: location
-    subnet_id: network.outputs.backendSubnetId
+    SQLServerName: SQLServerName
+    SQLServerDatabase: SQLDBName
+    SQLServerUsername: SQLAdministratorLogin
+    SQLServerPassword: SQLAdministratorLoginPassword
+    vnet_id: network.outputs.vnetId
+    subnet_id: network.outputs.privateSubnetId
   }
-
 }
 
 module sql 'modules/sql.bicep' = {
-  scope: resourceGroup(rg.name)
+  scope: resourceGroup(rg_name)
   name: 'sql-${workload}-deployment'
   params: {
+    location: location
+    SQLServerName: SQLServerName
+    SQLAdministratorLogin: SQLAdministratorLogin
+    SQLAdministratorLoginPassword: SQLAdministratorLoginPassword
+    SQLDBName: SQLDBName
+    vnet_id: network.outputs.vnetId
     subnet_id: network.outputs.privateSubnetId
   }
 }

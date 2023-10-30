@@ -15,15 +15,17 @@ param SQLAdministratorLogin string
 @description('SQL administrator login password')
 param SQLAdministratorLoginPassword string
 
-@description('Delegated subnet resource id used to setup vnet for a server')
+@description('Subnet id for SQL Private Endpoint')
 param subnet_id string
 
 @description('ID of the virtual network to which the private dns zone will be linked')
 param vnet_id string
 
-// Variables
+@description('Name of SQL Server private endpoint.')
+param privateEndpointName string = 'pe-${SQLServerName}'
 
-var private_dns_zone_name = '${SQLServerName}.private.mysql.database.azure.com'
+@description('Private DNS Zone Name.')
+param private_dns_zone_name string = '${SQLServerName}.private.mysql.database.azure.com'
 
 // Resources
 
@@ -50,23 +52,10 @@ resource SQLServer 'Microsoft.Sql/servers@2022-11-01-preview' = {
   properties: {
     administratorLogin: SQLAdministratorLogin
     administratorLoginPassword: SQLAdministratorLoginPassword
-    subnetId: subnet_id
-
-    // network: {// https://docs.microsoft.com/en-us/azure/templates/microsoft.sql/2022-11-01-preview/servers#ServerPropertiesForCreateOrUpdate
-    //   privateDnsZoneArmResourceId: private_dns_zone.id
-    //   privateEndpointConnections: [
-    //     {
-    //       name: 'private-dns-vnet-link-${SQLServerName}'
-    //       properties: {
-    //         privateLinkServiceConnectionState: {
-    //           status: 'Approved'
-    //           description: 'Auto-Approved'
-    //         }
-    //       }
-    //     }
-    //   ]
-    // }
-  } }
+    publicNetworkAccess: 'Disabled'
+    
+  } 
+}
 
 resource SQLDatabase 'Microsoft.Sql/servers/databases@2022-11-01-preview' = {
   parent: SQLServer
@@ -76,9 +65,6 @@ resource SQLDatabase 'Microsoft.Sql/servers/databases@2022-11-01-preview' = {
     name: 'Standard'
     tier: 'Standard'
   }
-  dependsOn: [
-    private_dns_zone_vnet_link
-  ]
 }
 
 resource SQLFirewallRules 'Microsoft.Sql/servers/firewallRules@2022-11-01-preview' = {
@@ -87,5 +73,60 @@ resource SQLFirewallRules 'Microsoft.Sql/servers/firewallRules@2022-11-01-previe
   properties: {
     startIpAddress: '0.0.0.0'
     endIpAddress: '255.255.255.255'
+  }
+}
+
+// Resources for SQL Server Private Endpoint
+
+resource SQLPrivateEndpoint 'Microsoft.Network/privateEndpoints@2021-05-01' = {
+  name: privateEndpointName
+  location: location
+  properties: {
+    subnet: {
+      id: subnet_id
+    }
+    privateLinkServiceConnections: [
+      {
+        name: privateEndpointName
+        properties: {
+          privateLinkServiceId: SQLServer.id
+          groupIds: [
+            'sqlServer'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+resource privateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: private_dns_zone_name
+  location: 'global'
+}
+
+resource privateDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: privateDnsZone
+  name: '${private_dns_zone_name}-link'
+  location: 'global'
+  properties: {
+    registrationEnabled: false
+    virtualNetwork: {
+      id: vnet_id
+    }
+  }
+}
+
+resource pvtEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2021-05-01' = {
+  name: '${privateEndpointName}-privateDnsZoneGroup'
+  parent: SQLPrivateEndpoint
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: '${privateEndpointName}-privateDnsZoneConfig'
+        properties: {
+          privateDnsZoneId: privateDnsZone.id
+        }
+      }
+    ]
   }
 }
