@@ -16,18 +16,22 @@ param environment string = 'dev'
 @description('name of the resource group where the workload will be deployed')
 param rg_name string
 
-@description('SQL Server Name')
-param SQLServerName string = 'sql-${workload}-${environment}-${location_abbreviation}'
+// @description('SQL Server Name')
+// param SQLServerName string = 'sql-${workload}-${environment}-${location_abbreviation}'
 
-@description('SQL Server Database Name')
-param SQLDBName string = 'db-${workload}-${environment}-${location_abbreviation}'
+// @description('SQL Server Database Name')
+// param SQLDBName string = 'db-${workload}-${environment}-${location_abbreviation}'
 
-@description('SQL administrator login')
-param SQLAdministratorLogin string
+// @description('SQL administrator login')
+// param SQLAdministratorLogin string
 
-@secure()
-@description('SQL administrator login password')
-param SQLAdministratorLoginPassword string
+// @secure()
+// @description('SQL administrator login password')
+// param SQLAdministratorLoginPassword string
+
+param cosmosDBAccountName string = 'cosmosaccount-${workload}-${environment}-${location_abbreviation}'
+param cosmosDBContainerName string = 'cosmoscontainer-${workload}-${environment}-${location_abbreviation}'
+param cosmosDBDatabaseName string = 'cosmosdb-${workload}-${environment}-${location_abbreviation}'
 
 // @description('Azure OpenAI API Key')
 // param azureOpenAIAPIKey string = ''
@@ -60,46 +64,71 @@ module network 'modules/vnet.bicep' = {
   }
 }
 
-module frontend 'modules/frontend.bicep' = {
+// module frontend 'modules/frontend.bicep' = {
+//   scope: resourceGroup(rg_name)
+//   name: 'frontend-${workload}-deployment'
+//   params: {
+//     location: location
+//     // azureOpenAIAPIKey: azureOpenAIAPIKey
+//     // azureOpenAIName: azureOpenAIName
+//     // azureSearchName: azureSearchName
+//     // blobSASToken: blobSASToken
+//     // botDirectLineChannelKey: botDirectLineChannelKey
+//     // botServiceName: botServiceName
+//     vnet_id: network.outputs.vnetId
+//     subnet_id: network.outputs.privateSubnetId
+//   }
+// }
+
+// module backend 'modules/backend.bicep' = {
+//   scope: resourceGroup(rg_name)
+//   name: 'backend-${workload}-deployment'
+//   params: {
+//     location: location
+//     SQLServerName: SQLServerName
+//     SQLServerDatabase: SQLDBName
+//     SQLServerUsername: SQLAdministratorLogin
+//     SQLServerPassword: SQLAdministratorLoginPassword
+//     vnet_id: network.outputs.vnetId
+//     subnet_id: network.outputs.privateSubnetId
+//   }
+// }
+
+// module sql 'modules/sql.bicep' = {
+//   scope: resourceGroup(rg_name)
+//   name: 'sql-${workload}-deployment'
+//   params: {
+//     location: location
+//     SQLServerName: SQLServerName
+//     SQLAdministratorLogin: SQLAdministratorLogin
+//     SQLAdministratorLoginPassword: SQLAdministratorLoginPassword
+//     SQLDBName: SQLDBName
+//     vnet_id: network.outputs.vnetId
+//     subnet_id: network.outputs.privateSubnetId
+//   }
+// }
+
+module cosmosdb 'modules/cosmosdb.bicep' = {
   scope: resourceGroup(rg_name)
-  name: 'frontend-${workload}-deployment'
+  name: 'cosmosdb-${workload}-deployment'
   params: {
     location: location
-    // azureOpenAIAPIKey: azureOpenAIAPIKey
-    // azureOpenAIName: azureOpenAIName
-    // azureSearchName: azureSearchName
-    // blobSASToken: blobSASToken
-    // botDirectLineChannelKey: botDirectLineChannelKey
-    // botServiceName: botServiceName
     vnet_id: network.outputs.vnetId
     subnet_id: network.outputs.privateSubnetId
+    cosmosDBAccountName: cosmosDBAccountName
+    cosmosDBContainerName: cosmosDBContainerName
+    cosmosDBDatabaseName: cosmosDBDatabaseName
   }
 }
 
-module backend 'modules/backend.bicep' = {
+module blobStorage 'modules/blobStorage.bicep' = {
   scope: resourceGroup(rg_name)
-  name: 'backend-${workload}-deployment'
+  name: 'blobStorage-${workload}-deployment'
   params: {
     location: location
-    SQLServerName: SQLServerName
-    SQLServerDatabase: SQLDBName
-    SQLServerUsername: SQLAdministratorLogin
-    SQLServerPassword: SQLAdministratorLoginPassword
     vnet_id: network.outputs.vnetId
     subnet_id: network.outputs.privateSubnetId
-  }
-}
-
-module sql 'modules/sql.bicep' = {
-  scope: resourceGroup(rg_name)
-  name: 'sql-${workload}-deployment'
-  params: {
-    location: location
-    SQLServerName: SQLServerName
-    SQLAdministratorLogin: SQLAdministratorLogin
-    SQLAdministratorLoginPassword: SQLAdministratorLoginPassword
-    SQLDBName: SQLDBName
-    vnet_id: network.outputs.vnetId
-    subnet_id: network.outputs.privateSubnetId
+    blobStorageAccountName: 'blbstr'
+    private_dns_zone_name: 'privatelink.blob.core.windows.net'
   }
 }
