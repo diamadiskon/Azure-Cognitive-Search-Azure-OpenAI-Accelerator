@@ -27,7 +27,8 @@ Azuredeploy.bicep in the root directory of this repository contains the code for
 | SQL Server and Database | Yes                 |
 | Cosmos DB               | Yes                 |
 | Bing Search API         | No                  |
-| Form Recognizer         | (Check Azure Docs)  |
+| Form Recognizer         | Yes                 |
 | Blob Storage Account    | Yes                 |
 | App Service Plan        | Yes                 |
 | Web App                 | Yes                 |
+| Azure Bot Service       | No                  | 
